@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import bg from './assets/pattern-bg.png';
 import marker from './assets/icon-location.svg';
 import Input from './components/Input';
@@ -9,13 +9,12 @@ import { Map, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-import data from './mock-resp.json';
-
 const AppContainer = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   max-height: 100vh;
+  height: 100vh;
   overflow: hidden;
 `
 
@@ -60,7 +59,7 @@ const MapContainer = styled.div`
     height: 70vh;
     max-height: 70vh;
     /* Card height */
-    top: -325px; 
+    top: -300px; 
 
     @media screen and ${device.desktop} {
       top: -119.2px; 
@@ -76,7 +75,39 @@ const MapContainer = styled.div`
   }
 `
 
+const spin = keyframes`
+  0% {
+    transform: rotate(0deg);
+    }
 
+  100% {
+    transform: rotate(360deg);
+  }
+`
+
+const Spinner = styled.div`
+  margin-top:10vh;
+  border: 12px solid #f3f3f3;
+  border-top: 12px solid var(--dark-gray);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: ${spin} 1s linear infinite;
+  justify-self: center;
+  align-self: center;
+`
+
+const ErrorMessage = styled.p`
+  /* color: var(--dark-gray); */
+  color: red;
+  font-weight: 500;
+  text-align: center;
+  justify-self: center;
+  align-self: center;
+  font-size: 18px;
+`
+
+//MAP Pointer
 const pointerIcon = new L.Icon({
   iconUrl: marker,
   iconAnchor: [5, 55],
@@ -85,45 +116,76 @@ const pointerIcon = new L.Icon({
 })
 
 function App() {
-
   const [ip, setIp] = useState(null);
   const [ipData, setIpData] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const map = useRef(null);
 
-
   useEffect(() => {
-    //TODO: call real api
-    console.log(data);
-    setIpData(data);
-  }, [ip]);
+    console.log("call api ip:", ip);
+    setIpData(null);
+    setError(null);
+    setLoading(true);
+    let ipParam = "";
+    if (ip)
+      ipParam = `?search=${ip}`
+
+    fetch(`/api/ip-data${ipParam}`)
+      .then(res => {
+        setInitialLoading(false); 
+        setLoading(false); 
+        if (!res.ok)  //check http error;
+          throw res
+        return res.json()
+      }).then(json => { 
+        setIpData(json); 
+      }).catch(err => {
+        err.json().then(jsonErr => {
+          setError(jsonErr.error);
+        });
+      })
+
+    }, [ip]);
 
   const panTo = () => {
     const leafletElement = map.current.leafletElement;
-    console.log(leafletElement)
     leafletElement.panTo([ipData.location.lat + 0.0005, ipData.location.lng]);
+  }
+
+  const onSearch = (ip) => {
+    setIp(ip);
   }
 
   return (
     <AppContainer>
-      <Header>
-        <Title>IP Address Tracker</Title>
-        <StyledInput onClick={setIp} />
-      </Header>
-      {ipData && <OverlapCard ip={ipData.ip} location={`${ipData.location.city}, ${ipData.location.region} ${ipData.location.postalCode}`} timezone={ipData.location.timezone} isp={ipData.isp} />}
-      {ipData && <MapContainer>
-        <Map ref={map} center={[ipData.location.lat, ipData.location.lng]} zoom={18}
-          noMoveStart={true} scrollWheelZoom='center' touchZoom={false} whenReady={panTo}>
-          <TileLayer
-            attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={[ipData.location.lat, ipData.location.lng]} icon={pointerIcon}>
-            <Popup>
-              The IP Location
-          </Popup>
-          </Marker>
-        </Map>
-      </MapContainer>}
+      {initialLoading && <Spinner />}
+      {!initialLoading && <>
+        <Header>
+          <Title>IP Address Tracker</Title>
+          <StyledInput onClick={onSearch} />
+        </Header>
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        {loading && <Spinner />}
+        {!loading && <>
+          {ipData && ipData.location && <OverlapCard ip={ipData.ip} location={`${ipData.location.city}, ${ipData.location.region} ${ipData.location.postalCode}`} timezone={ipData.location.timezone} isp={ipData.isp} />}
+          {ipData && ipData.location && <MapContainer>
+            <Map ref={map} center={[ipData.location.lat, ipData.location.lng]} zoom={18}
+              noMoveStart={true} scrollWheelZoom='center' touchZoom={false} whenReady={panTo}>
+              <TileLayer
+                attribution='&amp;copy <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={[ipData.location.lat, ipData.location.lng]} icon={pointerIcon}>
+                <Popup>
+                  The IP Location
+                  </Popup>
+              </Marker>
+            </Map>
+          </MapContainer>}
+        </>}
+      </>}
     </AppContainer>
   );
 }
