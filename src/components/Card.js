@@ -1,7 +1,18 @@
 import React from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { device } from '../constants';
 
+
+const slideInBottom = keyframes`
+    0% {
+        transform: translateX(-1000px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+`
 
 const CardContainer = styled.div`
     box-sizing: border-box;
@@ -14,6 +25,7 @@ const CardContainer = styled.div`
     background-color: white;
     width: 85%;
     z-index: 999;
+    animation: ${slideInBottom} 0.5s linear;
 
     @media screen and ${device.desktop} {
         flex-direction: row;
